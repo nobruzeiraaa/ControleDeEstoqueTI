@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bulgarelli - Controle de Estoque TI</title>
+  
+  <!-- Favicon Oficial Bulgarelli na aba do navegador -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23000000'/><text x='15' y='72' font-family='Georgia, serif' font-size='68' font-weight='900' fill='white'>B</text><path d='M68 28 h22 a4 4 0 0 1 4 4 v14 a4 4 0 0 1 -4 4 h-12 l-4 5 v-5 h-2 a4 4 0 0 1 -4 -4 v-14 a4 4 0 0 1 4 -4 z' fill='%23dc2626'/><circle cx='76' cy='37' r='2' fill='white'/><circle cx='82' cy='37' r='2' fill='white'/><circle cx='88' cy='37' r='2' fill='white'/></svg>">
+  
+  <!-- Framework Tailwind CSS para Estilização -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Biblioteca de Ícones Lucide -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Biblioteca React & ReactDOM (Modo Standalone) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Compilador Babel para processar JSX direto no navegador -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.97); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-white text-slate-900 selection:bg-red-600 selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      // --- Estados da Aplicação ---
+      const [darkMode, setDarkMode] = useState(false);
+      const [activeTab, setActiveTab] = useState('inventory'); // Controle da aba ativa ('inventory', 'history', 'categories')
+      const [searchTerm, setSearchTerm] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState('all');
+      const [stockFilter, setStockFilter] = useState('all'); // Filtro de nível de estoque ('all', 'low', 'normal')
+
+      // Categorias pré-cadastradas para o Departamento de TI
+      const [categories, setCategories] = useState([
+        { id: 'mouse', name: 'Mouse', icon: 'mouse' },
+        { id: 'keyboard', name: 'Teclado', icon: 'keyboard' },
+        { id: 'monitor', name: 'Monitor', icon: 'monitor' },
+        { id: 'hdmi', name: 'Cabo HDMI', icon: 'cable' },
+        { id: 'dp', name: 'Cabo DisplayPort', icon: 'cable' },
+        { id: 'headset', name: 'Headset', icon: 'headphones' },
+        { id: 'notebook', name: 'Notebook', icon: 'laptop' },
+        { id: 'desktop', name: 'Máquina / Desktop', icon: 'cpu' },
+      ]);
+
+      // Lista inicial de equipamentos no estoque (com persistência LocalStorage)
+      const [items, setItems] = useState(() => {
+        const saved = localStorage.getItem('bulgarelli_inventory_items');
+        if (saved) {
+          try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        }
+        return [
+          { id: '1', code: 'BULG-MSE', name: 'Mouse Sem Fio Dell', category: 'mouse', quantity: 12, minQuantity: 5, unitPrice: 75.00, location: 'Armário TI - Prateleira A' },
+          { id: '2', code: 'BULG-MSE', name: 'Mouse USB Logitech B100', category: 'mouse', quantity: 3, minQuantity: 5, unitPrice: 40.00, location: 'Armário TI - Prateleira A' },
+          { id: '3', code: 'BULG-KBD', name: 'Teclado USB Dell KB216', category: 'keyboard', quantity: 8, minQuantity: 4, unitPrice: 85.00, location: 'Armário TI - Prateleira A' },
+          { id: '4', code: 'BULG-MON', name: 'Monitor Dell 23.8" Full HD P2422H', category: 'monitor', quantity: 2, minQuantity: 3, unitPrice: 1100.00, location: 'Estoque Bancada TI' },
+          { id: '5', code: 'BULG-CBL', name: 'Cabo HDMI 2.0 1.8m', category: 'hdmi', quantity: 15, minQuantity: 6, unitPrice: 25.00, location: 'Gaveta Cabos 01' },
+          { id: '6', code: 'BULG-CBL', name: 'Cabo DisplayPort 1.4 1.8m', category: 'dp', quantity: 4, minQuantity: 5, unitPrice: 35.00, location: 'Gaveta Cabos 01' },
+          { id: '7', code: 'BULG-HST', name: 'Headset Logitech H390 USB', category: 'headset', quantity: 1, minQuantity: 4, unitPrice: 220.00, location: 'Armário TI - Prateleira B' },
+          { id: '8', code: 'BULG-NTB-01', name: 'Notebook Dell Latitude 3420 i5 16GB', category: 'notebook', quantity: 3, minQuantity: 2, unitPrice: 4500.00, location: 'Cofre TI' },
+          { id: '9', code: 'BULG-DTK-01', name: 'Desktop OptiPlex 3090 i5 8GB', category: 'desktop', quantity: 1, minQuantity: 2, unitPrice: 3800.00, location: 'Cofre TI' }
+        ];
+      });
+
+      // Histórico de auditoria (Entradas e Saídas registradas)
+      const [logs, setLogs] = useState(() => {
+        const saved = localStorage.getItem('bulgarelli_inventory_logs');
+        if (saved) {
+          try { return JSON.parse(saved); } catch (e) { console.error(e); }
+        }
+        return [
+          {
+            id: 'log-1',
+            date: new Date(Date.now() - 3600000 * 5).toISOString(),
+            itemId: '1',
+            itemName: 'Mouse Sem Fio Dell WM126',
+            type: 'IN',
+            quantity: 10,
+            reason: 'Reposição de Estoque (Compra)',
+            recipient: '-',
+            responsible: 'Suporte TI'
+          },
+          {
+            id: 'log-2',
+            date: new Date(Date.now() - 3600000 * 2).toISOString(),
+            itemId: '7',
+            itemName: 'Headset Logitech H390 USB',
+            type: 'OUT',
+            quantity: 2,
+            reason: 'Entrega para novo colaborador',
+            recipient: 'Mariana (Recursos Humanos)',
+            responsible: 'Suporte TI'
+          }
+        ];
+      });
+
+      // Estados de Controle das Telas Modais
+      const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+      const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
+      const [editingItem, setEditingItem] = useState(null);
+      const [selectedItemForMove, setSelectedItemForMove] = useState(null);
+      const [movementType, setMovementType] = useState('OUT');
+
+      // Formulários
+      const [newItemForm, setNewItemForm] = useState({
+        name: '', category: 'mouse', quantity: 0, minQuantity: 5, unitPrice: 0, location: '', code: ''
+      });
+
+      const [movementForm, setMovementForm] = useState({
+        quantity: 1, reason: 'Entrega para novo colaborador', recipient: '', responsible: ''
+      });
+
+      const [newCatName, setNewCatName] = useState('');
+
+      // Salvar dados no armazenamento local do navegador (LocalStorage)
+      useEffect(() => {
+        localStorage.setItem('bulgarelli_inventory_items', JSON.stringify(items));
+        if (window.lucide) window.lucide.createIcons();
+      }, [items]);
+
+      useEffect(() => {
+        localStorage.setItem('bulgarelli_inventory_logs', JSON.stringify(logs));
+        if (window.lucide) window.lucide.createIcons();
+      }, [logs]);
+
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      }, [activeTab, darkMode, isAddModalOpen, isMovementModalOpen]);
+
+      // Funções de manipulação do estoque
+      const handleSaveItem = (e) => {
+        e.preventDefault();
+        if (!newItemForm.name.trim()) return;
+
+        if (editingItem) {
+          setItems(items.map(item => item.id === editingItem.id ? {
+            ...item,
+            name: newItemForm.name,
+            category: newItemForm.category,
+            quantity: Number(newItemForm.quantity),
+            minQuantity: Number(newItemForm.minQuantity),
+            unitPrice: Number(newItemForm.unitPrice),
+            location: newItemForm.location,
+            code: newItemForm.code || item.code
+          } : item));
+        } else {
+          const createdItem = {
+            id: Date.now().toString(),
+            code: newItemForm.code || `BULG-${newItemForm.category.toUpperCase().slice(0, 3)}-${Math.floor(100 + Math.random() * 900)}`,
+            name: newItemForm.name,
+            category: newItemForm.category,
+            quantity: Number(newItemForm.quantity),
+            minQuantity: Number(newItemForm.minQuantity),
+            unitPrice: Number(newItemForm.unitPrice) || 0,
+            location: newItemForm.location || 'Estoque TI'
+          };
+          setItems([createdItem, ...items]);
+
+          if (Number(newItemForm.quantity) > 0) {
+            setLogs([{
+              id: Date.now().toString(),
+              date: new Date().toISOString(),
+              itemId: createdItem.id,
+              itemName: createdItem.name,
+              type: 'IN',
+              quantity: Number(newItemForm.quantity),
+              reason: 'Cadastro Inicial de Item',
+              recipient: '-',
+              responsible: 'Sistema TI'
+            }, ...logs]);
+          }
+        }
+
+        setIsAddModalOpen(false);
+        setEditingItem(null);
+      };
+
+      const handleMovementSubmit = (e) => {
+        e.preventDefault();
+        if (!selectedItemForMove) return;
+
+        const moveQty = Number(movementForm.quantity);
+        if (moveQty <= 0) return;
+
+        if (movementType === 'OUT' && moveQty > selectedItemForMove.quantity) {
+          alert('Quantidade solicitada maior do que a disponível em estoque!');
+          return;
+        }
+
+        const newQty = movementType === 'IN' 
+          ? selectedItemForMove.quantity + moveQty 
+          : selectedItemForMove.quantity - moveQty;
+
+        setItems(items.map(item => item.id === selectedItemForMove.id ? { ...item, quantity: newQty } : item));
+
+        const newLog = {
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          itemId: selectedItemForMove.id,
+          itemName: selectedItemForMove.name,
+          type: movementType,
+          quantity: moveQty,
+          reason: movementForm.reason,
+          recipient: movementType === 'OUT' ? movementForm.recipient : '-',
+          responsible: movementForm.responsible || 'Técnico TI'
+        };
+
+        setLogs([newLog, ...logs]);
+        setIsMovementModalOpen(false);
+        setSelectedItemForMove(null);
+      };
+
+      const handleDeleteItem = (id) => {
+        if (window.confirm('Tem certeza que deseja remover este item do estoque?')) {
+          setItems(items.filter(item => item.id !== id));
+        }
+      };
+
+      const handleAddCategory = (e) => {
+        e.preventDefault();
+        if (!newCatName.trim()) return;
+        const catId = newCatName.toLowerCase().replace(/\s+/g, '-');
+        setCategories([...categories, { id: catId, name: newCatName, icon: 'package' }]);
+        setNewCatName('');
+      };
+
+      const openQuickMove = (item, type) => {
+        setSelectedItemForMove(item);
+        setMovementType(type);
+        setMovementForm({
+          quantity: 1,
+          reason: type === 'OUT' ? 'Entrega para novo colaborador' : 'Reposição de Estoque',
+          recipient: '',
+          responsible: ''
+        });
+        setIsMovementModalOpen(true);
+      };
+
+      const startEditItem = (item) => {
+        setEditingItem(item);
+        setNewItemForm({
+          name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          minQuantity: item.minQuantity,
+          unitPrice: item.unitPrice || 0,
+          location: item.location || '',
+          code: item.code || ''
+        });
+        setIsAddModalOpen(true);
+      };
+
+      // Função para exportar os dados em formato CSV para Excel
+      const exportToCSV = () => {
+        const headers = ['Código,Nome,Categoria,Quantidade,Estoque Mínimo,Localização,Preço Unitário (R$)'];
+        const rows = items.map(i => `"${i.code}","${i.name}","${i.category}",${i.quantity},${i.minQuantity},"${i.location}",${i.unitPrice}`);
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `Estoque_TI_Bulgarelli_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      // Filtragem dos itens de estoque
+      const filteredItems = items.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              item.location.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+        const matchesStock = stockFilter === 'all' 
+          ? true 
+          : stockFilter === 'low' 
+            ? item.quantity <= item.minQuantity 
+            : item.quantity > item.minQuantity;
+
+        return matchesSearch && matchesCategory && matchesStock;
+      });
+
+      // Cálculo das métricas do painel
+      const metrics = {
+        totalTypes: items.length,
+        totalItemsCount: items.reduce((acc, i) => acc + i.quantity, 0),
+        lowStockCount: items.filter(i => i.quantity <= i.minQuantity).length,
+        todayEntries: logs.filter(l => l.type === 'IN' && new Date(l.date).toDateString() === new Date().toDateString()).reduce((acc, l) => acc + l.quantity, 0),
+        todayExits: logs.filter(l => l.type === 'OUT' && new Date(l.date).toDateString() === new Date().toDateString()).reduce((acc, l) => acc + l.quantity, 0),
+      };
+
+      return (
+        <div className={`min-h-screen ${darkMode ? 'bg-black text-white' : 'bg-white text-slate-900'} transition-colors duration-200`}>
+          
+          {/* Cabeçalho Principal (Navbar) */}
+          <header className={`border-b ${darkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'} sticky top-0 z-30 shadow-sm`}>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-20">
+                
+                {/* Logo da Bulgarelli */}
+                <div className="flex items-center space-x-3">
+                  <div className="flex flex-col">
+                    <div className="flex items-baseline space-x-1">
+                      <span className={`font-black text-2xl tracking-tight font-serif ${darkMode ? 'text-white' : 'text-slate-950'}`}>
+                        Bulgarelli
+                      </span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block ml-0.5"></span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-black tracking-wider text-red-600 uppercase">
+                        Recuperação & Inovação
+                      </span>
+                      <span className={`text-xs ${darkMode ? 'text-zinc-500' : 'text-slate-400'}`}>•</span>
+                      <span className={`text-xs font-semibold ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Controle de TI</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Abas de Navegação */}
+                <nav className="hidden md:flex space-x-1">
+                  <button
+                    onClick={() => setActiveTab('inventory')}
+                    className={`px-3.5 py-2 rounded-lg text-sm font-bold transition-all flex items-center space-x-2 ${
+                      activeTab === 'inventory' 
+                        ? 'bg-red-600 text-white shadow-sm shadow-red-600/40'
+                        : (darkMode ? 'text-zinc-300 hover:bg-zinc-900 hover:text-white' : 'text-slate-700 hover:bg-slate-100')
+                    }`}
+                  >
+                    <i data-lucide="package" className="w-4 h-4"></i>
+                    <span>Estoque & Periféricos</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('history')}
+                    className={`px-3.5 py-2 rounded-lg text-sm font-bold transition-all flex items-center space-x-2 ${
+                      activeTab === 'history' 
+                        ? 'bg-red-600 text-white shadow-sm shadow-red-600/40'
+                        : (darkMode ? 'text-zinc-300 hover:bg-zinc-900 hover:text-white' : 'text-slate-700 hover:bg-slate-100')
+                    }`}
+                  >
+                    <i data-lucide="history" className="w-4 h-4"></i>
+                    <span>Histórico (Entradas/Saídas)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('categories')}
+                    className={`px-3.5 py-2 rounded-lg text-sm font-bold transition-all flex items-center space-x-2 ${
+                      activeTab === 'categories' 
+                        ? 'bg-red-600 text-white shadow-sm shadow-red-600/40'
+                        : (darkMode ? 'text-zinc-300 hover:bg-zinc-900 hover:text-white' : 'text-slate-700 hover:bg-slate-100')
+                    }`}
+                  >
+                    <i data-lucide="filter" className="w-4 h-4"></i>
+                    <span>Categorias</span>
+                  </button>
+                </nav>
+
+                {/* Botões de Ação do Cabeçalho */}
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setDarkMode(!darkMode)}
+                    className={`p-2 rounded-lg border transition-colors ${
+                      darkMode 
+                        ? 'bg-zinc-900 border-zinc-800 text-amber-400 hover:bg-zinc-800' 
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                    title="Alternar Tema Escuro/Claro"
+                  >
+                    <i data-lucide={darkMode ? "sun" : "moon"} className="w-5 h-5"></i>
+                  </button>
+
+                  <button
+                    onClick={exportToCSV}
+                    className={`px-3.5 py-2 rounded-lg text-sm font-bold transition-colors flex items-center space-x-1.5 shadow-sm border ${
+                      darkMode 
+                        ? 'bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800' 
+                        : 'bg-white border-red-200 text-red-600 hover:bg-red-50'
+                    }`}
+                    title="Exportar CSV de Itens"
+                  >
+                    <i data-lucide="download" className="w-4 h-4 text-red-600"></i>
+                    <span className="hidden sm:inline">Exportar CSV</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Conteúdo Principal */}
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            
+            {/* Card de Métricas do Estoque */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className={`p-4 rounded-xl border ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Total em Estoque</p>
+                    <h3 className="text-2xl font-black mt-1">{metrics.totalItemsCount} <span className={`text-xs font-normal ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>unidades</span></h3>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-500' : 'text-slate-500'}`}>{metrics.totalTypes} tipos de equipamentos</p>
+                  </div>
+                  <div className="p-3 bg-red-600/10 text-red-600 rounded-xl">
+                    <i data-lucide="package" className="w-6 h-6"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`p-4 rounded-xl border ${
+                metrics.lowStockCount > 0 
+                  ? (darkMode ? 'bg-red-950/40 border-red-800' : 'bg-red-50 border-red-200')
+                  : (darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm')
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Alertas de Reposição</p>
+                    <h3 className={`text-2xl font-black mt-1 ${metrics.lowStockCount > 0 ? 'text-red-600' : ''}`}>
+                      {metrics.lowStockCount} <span className={`text-xs font-normal ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>itens críticos</span>
+                    </h3>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      {metrics.lowStockCount > 0 ? 'Fazer pedido de compra' : 'Estoque em nível seguro'}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-xl ${metrics.lowStockCount > 0 ? 'bg-red-600 text-white shadow-md shadow-red-600/30 animate-pulse' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                    <i data-lucide="alert-triangle" className="w-6 h-6"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`p-4 rounded-xl border ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Entradas Hoje</p>
+                    <h3 className="text-2xl font-black mt-1 text-emerald-500">+{metrics.todayEntries} <span className={`text-xs font-normal ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>itens</span></h3>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-500' : 'text-slate-500'}`}>Reposições recebidas</p>
+                  </div>
+                  <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl">
+                    <i data-lucide="arrow-down-left" className="w-6 h-6"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`p-4 rounded-xl border ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Saídas Hoje</p>
+                    <h3 className="text-2xl font-black mt-1 text-amber-500">-{metrics.todayExits} <span className={`text-xs font-normal ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>itens</span></h3>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-500' : 'text-slate-500'}`}>Entregas para colaboradores</p>
+                  </div>
+                  <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl">
+                    <i data-lucide="arrow-up-right" className="w-6 h-6"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Aba 1: Tabela de Estoque */}
+            {activeTab === 'inventory' && (
+              <div className="space-y-4">
+                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'} flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4`}>
+                  <div className="relative flex-1">
+                    <i data-lucide="search" className={`w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 ${darkMode ? 'text-zinc-500' : 'text-slate-400'}`}></i>
+                    <input
+                      type="text"
+                      placeholder="Buscar equipamento por nome, patrimônio ou local..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`w-full pl-9 pr-4 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 transition-colors ${
+                        darkMode ? 'bg-black border-zinc-800 text-white placeholder-zinc-500' : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className={`px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                        darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    >
+                      <option value="all">Todas Categorias</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={stockFilter}
+                      onChange={(e) => setStockFilter(e.target.value)}
+                      className={`px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                        darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    >
+                      <option value="all">Todos os Status</option>
+                      <option value="low">⚠️ Estoque Baixo (Repor)</option>
+                      <option value="normal">✅ Estoque Normal</option>
+                    </select>
+
+                    <button
+                      onClick={() => {
+                        setEditingItem(null);
+                        setNewItemForm({
+                          name: '',
+                          category: categories[0]?.id || 'mouse',
+                          quantity: 0,
+                          minQuantity: 5,
+                          unitPrice: 0,
+                          location: 'Estoque Central',
+                          code: ''
+                        });
+                        setIsAddModalOpen(true);
+                      }}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-colors flex items-center space-x-1 shadow-md shadow-red-600/30"
+                    >
+                      <i data-lucide="plus" className="w-4 h-4"></i>
+                      <span>Novo Equipamento</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className={`rounded-xl border overflow-hidden ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className={`text-xs uppercase tracking-wider ${darkMode ? 'bg-black text-zinc-400 border-b border-zinc-800' : 'bg-slate-100 text-slate-600 border-b border-slate-200'}`}>
+                        <tr>
+                          <th className="px-4 py-3.5">Código / Equipamento</th>
+                          <th className="px-4 py-3.5">Categoria</th>
+                          <th className="px-4 py-3.5">Localização</th>
+                          <th className="px-4 py-3.5 text-center">Qtde Atual</th>
+                          <th className="px-4 py-3.5 text-center">Estoque Mínimo</th>
+                          <th className="px-4 py-3.5">Status</th>
+                          <th className="px-4 py-3.5 text-right">Ações Rápidas</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${darkMode ? 'divide-zinc-800' : 'divide-slate-200'}`}>
+                        {filteredItems.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
+                              <i data-lucide="package" className="w-10 h-10 mx-auto mb-2 opacity-40 text-red-600"></i>
+                              <p>Nenhum item encontrado com os filtros aplicados.</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredItems.map(item => {
+                            const isLow = item.quantity <= item.minQuantity;
+                            const catObj = categories.find(c => c.id === item.category);
+
+                            return (
+                              <tr key={item.id} className={`hover:bg-red-600/5 transition-colors ${isLow && darkMode ? 'bg-red-950/20' : ''} ${isLow && !darkMode ? 'bg-red-50/50' : ''}`}>
+                                <td className="px-4 py-3">
+                                  <div className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    {item.name}
+                                  </div>
+                                  <span className={`text-xs font-mono ${darkMode ? 'text-zinc-400' : 'text-slate-400'}`}>{item.code}</span>
+                                </td>
+
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-bold ${
+                                    darkMode ? 'bg-black text-white border border-zinc-800' : 'bg-slate-100 text-slate-800'
+                                  }`}>
+                                    <i data-lucide={catObj ? catObj.icon : 'package'} className="w-3.5 h-3.5"></i>
+                                    <span>{catObj ? catObj.name : item.category}</span>
+                                  </span>
+                                </td>
+
+                                <td className={`px-4 py-3 text-xs font-medium ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                  {item.location || 'N/A'}
+                                </td>
+
+                                <td className="px-4 py-3 text-center font-black text-base">
+                                  <span className={isLow ? 'text-red-600 font-black' : (darkMode ? 'text-white' : 'text-slate-900')}>
+                                    {item.quantity}
+                                  </span>
+                                </td>
+
+                                <td className={`px-4 py-3 text-center text-xs ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                  Mínimo: <span className="font-bold">{item.minQuantity}</span>
+                                </td>
+
+                                <td className="px-4 py-3">
+                                  {isLow ? (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white shadow-sm shadow-red-600/30 animate-pulse">
+                                      <i data-lucide="alert-triangle" className="w-3 h-3 mr-1"></i>
+                                      Repor Estoque
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                      <i data-lucide="check-circle-2" className="w-3 h-3 mr-1"></i>
+                                      Estoque OK
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="px-4 py-3 text-right">
+                                  <div className="flex items-center justify-end space-x-2">
+                                    <button
+                                      onClick={() => openQuickMove(item, 'IN')}
+                                      className="p-1.5 bg-emerald-600/20 text-emerald-500 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors border border-emerald-500/30"
+                                      title="Registrar Entrada (+)"
+                                    >
+                                      <i data-lucide="arrow-down-left" className="w-4 h-4"></i>
+                                    </button>
+
+                                    <button
+                                      onClick={() => openQuickMove(item, 'OUT')}
+                                      className="p-1.5 bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white rounded-lg transition-colors border border-amber-500/30"
+                                      title="Registrar Saída (-)"
+                                    >
+                                      <i data-lucide="arrow-up-right" className="w-4 h-4"></i>
+                                    </button>
+
+                                    <button
+                                      onClick={() => startEditItem(item)}
+                                      className={`p-1.5 rounded-lg border transition-colors ${
+                                        darkMode ? 'text-zinc-300 border-zinc-800 hover:bg-zinc-800 hover:text-white' : 'text-slate-600 border-slate-200 hover:bg-slate-100'
+                                      }`}
+                                      title="Editar Equipamento"
+                                    >
+                                      <i data-lucide="edit-3" className="w-4 h-4"></i>
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleDeleteItem(item.id)}
+                                      className={`p-1.5 rounded-lg border transition-colors text-red-600 hover:bg-red-600 hover:text-white ${
+                                        darkMode ? 'border-zinc-800' : 'border-slate-200'
+                                      }`}
+                                      title="Excluir Equipamento"
+                                    >
+                                      <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Aba 2: Histórico de Movimentações (Auditoria) */}
+            {activeTab === 'history' && (
+              <div className="space-y-4">
+                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                  <h2 className="text-lg font-bold flex items-center space-x-2">
+                    <i data-lucide="history" className="w-5 h-5 text-red-600"></i>
+                    <span>Histórico de Entradas e Saídas — Bulgarelli TI</span>
+                  </h2>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    Registro detalhado de todas as movimentações realizadas pelos técnicos de TI.
+                  </p>
+                </div>
+
+                <div className={`rounded-xl border overflow-hidden ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className={`text-xs uppercase tracking-wider ${darkMode ? 'bg-black text-zinc-400 border-b border-zinc-800' : 'bg-slate-100 text-slate-600 border-b border-slate-200'}`}>
+                        <tr>
+                          <th className="px-4 py-3.5">Data / Hora</th>
+                          <th className="px-4 py-3.5">Tipo</th>
+                          <th className="px-4 py-3.5">Equipamento</th>
+                          <th className="px-4 py-3.5 text-center">Quantidade</th>
+                          <th className="px-4 py-3.5">Motivo / Finalidade</th>
+                          <th className="px-4 py-3.5">Recebedor / Destino</th>
+                          <th className="px-4 py-3.5">Operador TI</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${darkMode ? 'divide-zinc-800' : 'divide-slate-200'}`}>
+                        {logs.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
+                              Nenhuma movimentação registrada até o momento.
+                            </td>
+                          </tr>
+                        ) : (
+                          logs.map(log => (
+                            <tr key={log.id} className="hover:bg-red-600/5 transition-colors">
+                              <td className={`px-4 py-3 font-mono text-xs ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                {new Date(log.date).toLocaleString('pt-BR')}
+                              </td>
+                              <td className="px-4 py-3">
+                                {log.type === 'IN' ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                                    <i data-lucide="arrow-down-left" className="w-3 h-3 mr-1"></i>
+                                    ENTRADA
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                                    <i data-lucide="arrow-up-right" className="w-3 h-3 mr-1"></i>
+                                    SAÍDA
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 font-bold">
+                                {log.itemName}
+                              </td>
+                              <td className="px-4 py-3 text-center font-black">
+                                {log.type === 'IN' ? `+${log.quantity}` : `-${log.quantity}`}
+                              </td>
+                              <td className={`px-4 py-3 ${darkMode ? 'text-zinc-300' : 'text-slate-700'}`}>
+                                {log.reason}
+                              </td>
+                              <td className={`px-4 py-3 text-xs font-medium ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                                {log.recipient || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-red-600 font-black">
+                                {log.responsible}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Aba 3: Gerenciamento de Categorias */}
+            {activeTab === 'categories' && (
+              <div className="space-y-4">
+                <div className={`p-4 rounded-xl border ${darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                  <h2 className="text-lg font-bold">Gerenciar Categorias de Periféricos</h2>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    Adicione e visualize as categorias utilizadas pela equipe de TI na Bulgarelli.
+                  </p>
+                  
+                  <form onSubmit={handleAddCategory} className="mt-4 flex gap-2 max-w-md">
+                    <input
+                      type="text"
+                      placeholder="Nova categoria (ex: Adaptadores, NoBreaks...)"
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      className={`flex-1 px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                        darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-lg transition-colors flex items-center space-x-1 shadow-md shadow-red-600/30"
+                    >
+                      <i data-lucide="plus" className="w-4 h-4"></i>
+                      <span>Adicionar</span>
+                    </button>
+                  </form>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {categories.map(cat => {
+                    const count = items.filter(i => i.category === cat.id).length;
+                    return (
+                      <div key={cat.id} className={`p-4 rounded-xl border flex items-center justify-between ${
+                        darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-200 shadow-sm'
+                      }`}>
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 bg-red-600/10 text-red-600 rounded-lg">
+                            <i data-lucide={cat.icon || 'package'} className="w-5 h-5"></i>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-sm">{cat.name}</h4>
+                            <p className={`text-xs ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>{count} equipamentos</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          {/* Modal 1: Movimentação Rápida (Entrada ou Saída) */}
+          {isMovementModalOpen && selectedItemForMove && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+              <div className={`w-full max-w-md p-6 rounded-2xl shadow-2xl border ${darkMode ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+                
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold flex items-center space-x-2">
+                    {movementType === 'IN' ? (
+                      <span className="text-emerald-500 flex items-center gap-1">
+                        <i data-lucide="arrow-down-left" className="w-5 h-5"></i> Entrada de Item
+                      </span>
+                    ) : (
+                      <span className="text-amber-500 flex items-center gap-1">
+                        <i data-lucide="arrow-up-right" className="w-5 h-5"></i> Saída de Item
+                      </span>
+                    )}
+                  </h3>
+                  <button 
+                    onClick={() => setIsMovementModalOpen(false)}
+                    className={`p-1 ${darkMode ? 'text-zinc-400 hover:text-white' : 'text-slate-400 hover:text-slate-800'}`}
+                  >
+                    <i data-lucide="x-circle" className="w-5 h-5"></i>
+                  </button>
+                </div>
+
+                <div className={`p-3.5 rounded-xl border mb-4 ${darkMode ? 'bg-black border-zinc-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <p className={`text-xs ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Item Selecionado:</p>
+                  <p className="font-black text-sm text-red-600">{selectedItemForMove.name}</p>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Estoque Atual: <span className="font-bold text-red-600">{selectedItemForMove.quantity}</span> un.</p>
+                </div>
+
+                <form onSubmit={handleMovementSubmit} className="space-y-4">
+                  <div>
+                    <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Quantidade</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={movementType === 'OUT' ? selectedItemForMove.quantity : 9999}
+                      required
+                      value={movementForm.quantity}
+                      onChange={(e) => setMovementForm({ ...movementForm, quantity: e.target.value })}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                        darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Motivo / Finalidade</label>
+                    <select
+                      value={movementForm.reason}
+                      onChange={(e) => setMovementForm({ ...movementForm, reason: e.target.value })}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                        darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    >
+                      {movementType === 'OUT' ? (
+                        <>
+                          <option value="Entrega para novo colaborador">Entrega para novo colaborador</option>
+                          <option value="Substituição por defeito / Troca">Substituição por defeito / Troca</option>
+                          <option value="Empréstimo Temporário">Empréstimo Temporário</option>
+                          <option value="Descarte / Quebrado">Descarte / Quebrado</option>
+                          <option value="Uso Interno TI">Uso Interno TI</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Reposição de Estoque">Reposição de Estoque (Compra)</option>
+                          <option value="Devolução de Colaborador">Devolução de Colaborador</option>
+                          <option value="Retorno de Manutenção">Retorno de Manutenção</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  {movementType === 'OUT' && (
+                    <div>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Entregue Para (Colaborador / Setor)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: João da Silva (Financeiro)"
+                        value={movementForm.recipient}
+                        onChange={(e) => setMovementForm({ ...movementForm, recipient: e.target.value })}
+                        className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                          darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Responsável da TI (Seu Nome)</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Carlos (Analista TI)"
+                      required
+                      value={movementForm.responsible}
+                      onChange={(e) => setMovementForm({ ...movementForm, responsible: e.target.value })}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                        darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsMovementModalOpen(false)}
+                      className={`px-4 py-2 text-sm font-bold transition-colors ${darkMode ? 'text-zinc-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className={`px-4 py-2 text-white font-bold text-sm rounded-lg transition-colors ${
+                        movementType === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'
+                      }`}
+                    >
+                      Confirmar {movementType === 'IN' ? 'Entrada' : 'Saída'}
+                    </button>
+                  </div>
+                </form>
+
+              </div>
+            </div>
+          )}
+
+          {/* Modal 2: Cadastro / Edição de Equipamento */}
+          {isAddModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+              <div className={`w-full max-w-lg p-6 rounded-2xl shadow-2xl border ${darkMode ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+                
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold">
+                    {editingItem ? 'Editar Equipamento' : 'Cadastrar Novo Equipamento'}
+                  </h3>
+                  <button 
+                    onClick={() => setIsAddModalOpen(false)}
+                    className={`p-1 ${darkMode ? 'text-zinc-400 hover:text-white' : 'text-slate-400 hover:text-slate-800'}`}
+                  >
+                    <i data-lucide="x-circle" className="w-5 h-5"></i>
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveItem} className="space-y-4">
+                  
+                  <div>
+                    <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Nome do Equipamento / Modelo</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Mouse Sem Fio Logitech M170"
+                      required
+                      value={newItemForm.name}
+                      onChange={(e) => setNewItemForm({ ...newItemForm, name: e.target.value })}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                        darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Categoria</label>
+                      <select
+                        value={newItemForm.category}
+                        onChange={(e) => setNewItemForm({ ...newItemForm, category: e.target.value })}
+                        className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                          darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      >
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Código / Patrimônio</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: BULG-PER-005"
+                        value={newItemForm.code}
+                        onChange={(e) => setNewItemForm({ ...newItemForm, code: e.target.value })}
+                        className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                          darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Quantidade Inicial</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={newItemForm.quantity}
+                        onChange={(e) => setNewItemForm({ ...newItemForm, quantity: e.target.value })}
+                        className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                          darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Estoque Mínimo (Alerta)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={newItemForm.minQuantity}
+                        onChange={(e) => setNewItemForm({ ...newItemForm, minQuantity: e.target.value })}
+                        className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                          darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Localização no Armário</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Prateleira A2"
+                        value={newItemForm.location}
+                        onChange={(e) => setNewItemForm({ ...newItemForm, location: e.target.value })}
+                        className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                          darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-xs font-bold uppercase mb-1 ${darkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Preço Unitário (R$)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={newItemForm.unitPrice}
+                        onChange={(e) => setNewItemForm({ ...newItemForm, unitPrice: e.target.value })}
+                        className={`w-full px-3 py-2 text-sm rounded-lg border outline-none focus:ring-2 focus:ring-red-600 ${
+                          darkMode ? 'bg-black border-zinc-800 text-white' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddModalOpen(false)}
+                      className={`px-4 py-2 text-sm font-bold transition-colors ${darkMode ? 'text-zinc-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-lg transition-colors shadow-md shadow-red-600/30"
+                    >
+                      {editingItem ? 'Salvar Alterações' : 'Cadastrar Equipamento'}
+                    </button>
+                  </div>
+                </form>
+
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    // Inicialização do elemento raiz do React
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
