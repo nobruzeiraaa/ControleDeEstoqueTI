@@ -68,13 +68,13 @@
           try { return JSON.parse(saved); } catch (e) { console.error(e); }
         }
         return [
-          { id: '1', code: 'BULG-MSE', name: 'Mouse Sem Fio Dell', category: 'mouse', quantity: 12, minQuantity: 5, unitPrice: 75.00, location: 'Armário TI - Prateleira A' },
-          { id: '2', code: 'BULG-MSE', name: 'Mouse USB Logitech B100', category: 'mouse', quantity: 3, minQuantity: 5, unitPrice: 40.00, location: 'Armário TI - Prateleira A' },
-          { id: '3', code: 'BULG-KBD', name: 'Teclado USB Dell KB216', category: 'keyboard', quantity: 8, minQuantity: 4, unitPrice: 85.00, location: 'Armário TI - Prateleira A' },
-          { id: '4', code: 'BULG-MON', name: 'Monitor Dell 23.8" Full HD P2422H', category: 'monitor', quantity: 2, minQuantity: 3, unitPrice: 1100.00, location: 'Estoque Bancada TI' },
-          { id: '5', code: 'BULG-CBL', name: 'Cabo HDMI 2.0 1.8m', category: 'hdmi', quantity: 15, minQuantity: 6, unitPrice: 25.00, location: 'Gaveta Cabos 01' },
-          { id: '6', code: 'BULG-CBL', name: 'Cabo DisplayPort 1.4 1.8m', category: 'dp', quantity: 4, minQuantity: 5, unitPrice: 35.00, location: 'Gaveta Cabos 01' },
-          { id: '7', code: 'BULG-HST', name: 'Headset Logitech H390 USB', category: 'headset', quantity: 1, minQuantity: 4, unitPrice: 220.00, location: 'Armário TI - Prateleira B' },
+          { id: '1', code: 'BULG-MSE-01', name: 'Mouse Sem Fio Dell WM126', category: 'mouse', quantity: 12, minQuantity: 5, unitPrice: 75.00, location: 'Armário TI - Prateleira A' },
+          { id: '2', code: 'BULG-MSE-02', name: 'Mouse USB Logitech B100', category: 'mouse', quantity: 3, minQuantity: 5, unitPrice: 40.00, location: 'Armário TI - Prateleira A' },
+          { id: '3', code: 'BULG-KBD-01', name: 'Teclado USB Dell KB216', category: 'keyboard', quantity: 8, minQuantity: 4, unitPrice: 85.00, location: 'Armário TI - Prateleira A' },
+          { id: '4', code: 'BULG-MON-01', name: 'Monitor Dell 23.8" Full HD P2422H', category: 'monitor', quantity: 2, minQuantity: 3, unitPrice: 1100.00, location: 'Estoque Bancada TI' },
+          { id: '5', code: 'BULG-CBL-01', name: 'Cabo HDMI 2.0 1.8m', category: 'hdmi', quantity: 15, minQuantity: 6, unitPrice: 25.00, location: 'Gaveta Cabos 01' },
+          { id: '6', code: 'BULG-CBL-02', name: 'Cabo DisplayPort 1.4 1.8m', category: 'dp', quantity: 4, minQuantity: 5, unitPrice: 35.00, location: 'Gaveta Cabos 01' },
+          { id: '7', code: 'BULG-HST-01', name: 'Headset Logitech H390 USB', category: 'headset', quantity: 1, minQuantity: 4, unitPrice: 220.00, location: 'Armário TI - Prateleira B' },
           { id: '8', code: 'BULG-NTB-01', name: 'Notebook Dell Latitude 3420 i5 16GB', category: 'notebook', quantity: 3, minQuantity: 2, unitPrice: 4500.00, location: 'Cofre TI' },
           { id: '9', code: 'BULG-DTK-01', name: 'Desktop OptiPlex 3090 i5 8GB', category: 'desktop', quantity: 1, minQuantity: 2, unitPrice: 3800.00, location: 'Cofre TI' }
         ];
@@ -308,32 +308,46 @@
 
       return (
         <div className={`min-h-screen ${darkMode ? 'bg-black text-white' : 'bg-white text-slate-900'} transition-colors duration-200`}>
-          
           {/* Cabeçalho Principal (Navbar) */}
-          <header className={`border-b ${darkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'} sticky top-0 z-30 shadow-sm`}>
+          <header className={`border-b ${darkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'} sticky top-0 z-30 shadow-sm transition-colors duration-200`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center justify-between h-20">
-                
-                {/* Logo da Bulgarelli */}
-                <div className="flex items-center space-x-3">
-                  <div className="flex flex-col">
-                    <div className="flex items-baseline space-x-1">
-                      <span className={`font-black text-2xl tracking-tight font-serif ${darkMode ? 'text-white' : 'text-slate-950'}`}>
-                        Bulgarelli
-                      </span>
-                      <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block ml-0.5"></span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-black tracking-wider text-red-600 uppercase">
-                        Recuperação & Inovação
-                      </span>
-                      <span className={`text-xs ${darkMode ? 'text-zinc-500' : 'text-slate-400'}`}>•</span>
-                      <span className={`text-xs font-semibold ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Controle de TI</span>
-                    </div>
-                  </div>
+            
+            {/* Logo Profissional da Bulgarelli (Reativa ao Tema Claro / Escuro) */}
+            <div className="flex items-center space-x-3.5">
+              <div className={`p-2.5 rounded-xl border flex items-center justify-center shadow-sm transition-colors duration-200 ${
+                darkMode ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <svg className="w-8 h-8" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* Fundo do Ícone */}
+                  <rect width="100" height="100" rx="20" fill={darkMode ? '#000000' : '#0f172a'} />
+                  {/* Letra B com preenchimento em alto contraste */}
+                  <path d="M26 22 H54 C66 22 74 28 74 38 C74 45 69 50 62 52 C71 55 76 61 76 70 C76 81 67 86 54 86 H26 V22 Z M40 34 V47 H52 C58 47 62 44 62 40.5 C62 37 58 34 52 34 H40 Z M40 57 V74 H54 C60 74 64 70.5 64 65.5 C64 60.5 60 57 54 57 H40 Z" fill="#ffffff"/>
+                  {/* Ícone do balão de fala da inovação em vermelho da Bulgarelli */}
+                  <path d="M66 24 h20 a4 4 0 0 1 4 4 v12 a4 4 0 0 1 -4 4 h-10 l-4 5 v-5 h-2 a4 4 0 0 1 -4 -4 v-12 a4 4 0 0 1 4 -4 z" fill="#dc2626"/>
+                  <circle cx="73" cy="32" r="1.8" fill="white"/>
+                  <circle cx="78" cy="32" r="1.8" fill="white"/>
+                  <circle cx="83" cy="32" r="1.8" fill="white"/>
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-baseline space-x-1">
+                  <span className={`font-black text-2xl tracking-tight font-serif ${darkMode ? 'text-white' : 'text-slate-950'}`}>
+                    Bulgarelli
+                  </span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-600 inline-block ml-0.5 animate-pulse"></span>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[11px] font-black tracking-widest text-red-600 uppercase">
+                    Recuperação & Inovação
+                  </span>
+                  <span className={`text-xs ${darkMode ? 'text-zinc-600' : 'text-slate-300'}`}>•</span>
+                  <span className={`text-[11px] font-semibold ${darkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Sistema de TI</span>
+                </div>
+              </div>
+            </div>
 
-                {/* Abas de Navegação */}
+            {/* Abas de Navegação */}
                 <nav className="hidden md:flex space-x-1">
                   <button
                     onClick={() => setActiveTab('inventory')}
@@ -384,19 +398,6 @@
                     title="Alternar Tema Escuro/Claro"
                   >
                     <i data-lucide={darkMode ? "sun" : "moon"} className="w-5 h-5"></i>
-                  </button>
-
-                  <button
-                    onClick={exportToCSV}
-                    className={`px-3.5 py-2 rounded-lg text-sm font-bold transition-colors flex items-center space-x-1.5 shadow-sm border ${
-                      darkMode 
-                        ? 'bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800' 
-                        : 'bg-white border-red-200 text-red-600 hover:bg-red-50'
-                    }`}
-                    title="Exportar CSV de Itens"
-                  >
-                    <i data-lucide="download" className="w-4 h-4 text-red-600"></i>
-                    <span className="hidden sm:inline">Exportar CSV</span>
                   </button>
                 </div>
               </div>
